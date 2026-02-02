@@ -131,12 +131,20 @@ def get_recommendation_keyboard(
     )
     builder.row(*row1)
 
-    # Second row: Next and New request
+    # Second row: Watched and Next
     builder.row(
+        InlineKeyboardButton(
+            text=get_text("btn_watched", lang),
+            callback_data=f"rec:watched:{tmdb_id}:{session_id}"
+        ),
         InlineKeyboardButton(
             text=get_text("btn_next", lang),
             callback_data=f"rec:next:{session_id}"
-        ),
+        )
+    )
+
+    # Third row: New request
+    builder.row(
         InlineKeyboardButton(
             text=get_text("btn_new_request", lang),
             callback_data="rec:new_request"

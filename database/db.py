@@ -73,6 +73,16 @@ class Database:
                 FOREIGN KEY (user_id) REFERENCES users(telegram_id),
                 UNIQUE(user_id, tmdb_id)
             );
+
+            CREATE TABLE IF NOT EXISTS watched_movies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                tmdb_id INTEGER,
+                title TEXT,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(telegram_id),
+                UNIQUE(user_id, tmdb_id)
+            );
         """)
         await self.connection.commit()
 
@@ -210,6 +220,30 @@ class Database:
     async def is_movie_saved(self, user_id: int, tmdb_id: int) -> bool:
         cursor = await self.connection.execute(
             "SELECT 1 FROM saved_movies WHERE user_id = ? AND tmdb_id = ?",
+            (user_id, tmdb_id)
+        )
+        return await cursor.fetchone() is not None
+
+    # Watched movies operations
+    async def mark_as_watched(self, user_id: int, tmdb_id: int, title: str):
+        await self.connection.execute(
+            """INSERT OR IGNORE INTO watched_movies (user_id, tmdb_id, title)
+               VALUES (?, ?, ?)""",
+            (user_id, tmdb_id, title)
+        )
+        await self.connection.commit()
+
+    async def get_watched_movie_ids(self, user_id: int) -> list[int]:
+        cursor = await self.connection.execute(
+            "SELECT tmdb_id FROM watched_movies WHERE user_id = ?",
+            (user_id,)
+        )
+        rows = await cursor.fetchall()
+        return [row[0] for row in rows]
+
+    async def is_movie_watched(self, user_id: int, tmdb_id: int) -> bool:
+        cursor = await self.connection.execute(
+            "SELECT 1 FROM watched_movies WHERE user_id = ? AND tmdb_id = ?",
             (user_id, tmdb_id)
         )
         return await cursor.fetchone() is not None

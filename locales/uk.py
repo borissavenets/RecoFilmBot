@@ -150,7 +150,9 @@ TEXTS = {
     "btn_save": "Зберегти",
     "btn_saved_mark": "Збережено",
     "btn_new_request": "Інший запит",
+    "btn_watched": "Вже бачив",
     "movie_saved": "Фільм збережено!",
+    "movie_watched": "Позначено як переглянутий!",
     "no_trailer": "На жаль, трейлер не знайдено.",
 
     # Profile

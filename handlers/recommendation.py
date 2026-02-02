@@ -57,8 +57,10 @@ async def generate_and_show_recommendation(
         "afterfeel": parse_list_from_json(base_profile.get("afterfeel")),
     }
 
-    # Get excluded movie IDs
-    excluded_ids = await db.get_shown_movie_ids(user_id)
+    # Get excluded movie IDs (shown + watched)
+    shown_ids = await db.get_shown_movie_ids(user_id)
+    watched_ids = await db.get_watched_movie_ids(user_id)
+    excluded_ids = list(set(shown_ids + watched_ids))
 
     tmdb_language = "uk-UA" if lang == "uk" else "en-US"
     movie_data = None
@@ -253,6 +255,48 @@ async def save_movie(callback: CallbackQuery, db: Database):
         await callback.answer(get_text("movie_saved", lang))
     else:
         await callback.answer(get_text("error_occurred", lang))
+
+
+@router.callback_query(F.data.startswith("rec:watched:"))
+async def mark_watched(callback: CallbackQuery, db: Database):
+    """Mark movie as watched and show next recommendation."""
+    parts = callback.data.split(":")
+    tmdb_id = int(parts[2])
+    session_id = int(parts[3])
+
+    user = await db.get_user(callback.from_user.id)
+    lang = user["language"] if user else "uk"
+    tmdb_language = "uk-UA" if lang == "uk" else "en-US"
+
+    # Get movie title
+    movie_data = await tmdb_service.get_movie_details(tmdb_id, tmdb_language)
+    title = movie_data["title"] if movie_data else "Unknown"
+
+    # Mark as watched
+    await db.mark_as_watched(callback.from_user.id, tmdb_id, title)
+    await callback.answer(get_text("movie_watched", lang))
+
+    # Get session data and show next
+    session = await db.get_session(session_id)
+    if not session:
+        await callback.answer(get_text("error_occurred", lang))
+        return
+
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    loading_msg = await callback.message.answer(get_text("searching_movie", lang))
+
+    await generate_and_show_recommendation(
+        loading_msg,
+        db,
+        callback.from_user.id,
+        session_id,
+        session["dynamic_answers"],
+        lang
+    )
 
 
 @router.callback_query(F.data.startswith("rec:next:"))

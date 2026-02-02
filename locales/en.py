@@ -150,7 +150,9 @@ TEXTS = {
     "btn_save": "Save",
     "btn_saved_mark": "Saved",
     "btn_new_request": "New request",
+    "btn_watched": "Already watched",
     "movie_saved": "Movie saved!",
+    "movie_watched": "Marked as watched!",
     "no_trailer": "Sorry, trailer not found.",
 
     # Profile
