@@ -20,12 +20,9 @@ class BaseSurveyStates(StatesGroup):
     emotions_dislike = State()
     complexity = State()
     favorite_movies = State()
-    disliked_movies = State()
     genres_like = State()
-    genres_dislike = State()
     visual_style = State()
     characters_like = State()
-    characters_dislike = State()
     taboo = State()
     afterfeel = State()
 
@@ -181,32 +178,20 @@ async def process_complexity(callback: CallbackQuery, state: FSMContext):
     await state.update_data(complexity=complexity)
     await state.set_state(BaseSurveyStates.favorite_movies)
 
-    await callback.message.edit_text(get_text("base_q4_favorite_movies", lang))
+    await callback.message.edit_text(
+        get_text("base_q4_favorite_movies", lang),
+        reply_markup=get_skip_keyboard(lang, "base_favorite")
+    )
     await callback.answer()
 
 
-# Step 4: Favorite Movies (text input)
-@router.message(BaseSurveyStates.favorite_movies)
-async def process_favorite_movies(message: Message, state: FSMContext):
+# Step 4: Favorite Movies (text input or skip)
+@router.callback_query(BaseSurveyStates.favorite_movies, F.data == "base_favorite:skip")
+async def skip_favorite_movies(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     lang = data.get("lang", "uk")
 
-    await state.update_data(favorite_movies=message.text)
-    await state.set_state(BaseSurveyStates.disliked_movies)
-
-    await message.answer(
-        get_text("base_q5_disliked_movies", lang),
-        reply_markup=get_skip_keyboard(lang, "base_disliked")
-    )
-
-
-# Step 5: Disliked Movies (text input or skip)
-@router.callback_query(BaseSurveyStates.disliked_movies, F.data == "base_disliked:skip")
-async def skip_disliked_movies(callback: CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    lang = data.get("lang", "uk")
-
-    await state.update_data(disliked_movies="", selected=[])
+    await state.update_data(favorite_movies="", selected=[])
     await state.set_state(BaseSurveyStates.genres_like)
 
     await callback.message.edit_text(
@@ -216,18 +201,12 @@ async def skip_disliked_movies(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-@router.message(BaseSurveyStates.disliked_movies)
-async def process_disliked_movies(message: Message, state: FSMContext):
+@router.message(BaseSurveyStates.favorite_movies)
+async def process_favorite_movies(message: Message, state: FSMContext):
     data = await state.get_data()
     lang = data.get("lang", "uk")
 
-    text = message.text.lower()
-    if text in ["пропустити", "skip", "ні", "no"]:
-        await state.update_data(disliked_movies="")
-    else:
-        await state.update_data(disliked_movies=message.text)
-
-    await state.update_data(selected=[])
+    await state.update_data(favorite_movies=message.text, selected=[])
     await state.set_state(BaseSurveyStates.genres_like)
 
     await message.answer(
@@ -236,7 +215,7 @@ async def process_disliked_movies(message: Message, state: FSMContext):
     )
 
 
-# Step 6: Genres Like
+# Step 5: Genres Like
 @router.callback_query(BaseSurveyStates.genres_like, F.data.startswith("base_genre_like:"))
 async def process_genres_like(callback: CallbackQuery, state: FSMContext):
     action = callback.data.split(":")[1]
@@ -250,11 +229,11 @@ async def process_genres_like(callback: CallbackQuery, state: FSMContext):
             return
 
         await state.update_data(genres_like=list(selected), selected=[])
-        await state.set_state(BaseSurveyStates.genres_dislike)
+        await state.set_state(BaseSurveyStates.visual_style)
 
         await callback.message.edit_text(
-            f"{get_text('base_q7_genres_dislike', lang)}\n\n{get_text('select_multiple', lang)}",
-            reply_markup=get_multi_select_keyboard(GENRE_OPTIONS, set(), lang, "base_genre_dislike")
+            f"{get_text('base_q8_visual', lang)}\n\n{get_text('select_multiple', lang)}",
+            reply_markup=get_multi_select_keyboard(VISUAL_OPTIONS, set(), lang, "base_visual")
         )
     else:
         if action in selected:
@@ -270,21 +249,25 @@ async def process_genres_like(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-# Step 7: Genres Dislike
-@router.callback_query(BaseSurveyStates.genres_dislike, F.data.startswith("base_genre_dislike:"))
-async def process_genres_dislike(callback: CallbackQuery, state: FSMContext):
+# Step 6: Visual Style (multi-select)
+@router.callback_query(BaseSurveyStates.visual_style, F.data.startswith("base_visual:"))
+async def process_visual_style(callback: CallbackQuery, state: FSMContext):
     action = callback.data.split(":")[1]
     data = await state.get_data()
     lang = data.get("lang", "uk")
     selected = set(data.get("selected", []))
 
     if action == "done":
-        await state.update_data(genres_dislike=list(selected), selected=[])
-        await state.set_state(BaseSurveyStates.visual_style)
+        if not selected:
+            await callback.answer(get_text("min_one_option", lang))
+            return
+
+        await state.update_data(visual_style=list(selected), selected=[])
+        await state.set_state(BaseSurveyStates.characters_like)
 
         await callback.message.edit_text(
-            get_text("base_q8_visual", lang),
-            reply_markup=get_single_select_keyboard(VISUAL_OPTIONS, lang, "base_visual")
+            f"{get_text('base_q9_characters_like', lang)}\n\n{get_text('select_multiple', lang)}",
+            reply_markup=get_multi_select_keyboard(CHARACTER_OPTIONS, set(), lang, "base_char_like")
         )
     else:
         if action in selected:
@@ -294,30 +277,13 @@ async def process_genres_dislike(callback: CallbackQuery, state: FSMContext):
 
         await state.update_data(selected=list(selected))
         await callback.message.edit_reply_markup(
-            reply_markup=get_multi_select_keyboard(GENRE_OPTIONS, selected, lang, "base_genre_dislike")
+            reply_markup=get_multi_select_keyboard(VISUAL_OPTIONS, selected, lang, "base_visual")
         )
 
     await callback.answer()
 
 
-# Step 8: Visual Style
-@router.callback_query(BaseSurveyStates.visual_style, F.data.startswith("base_visual:"))
-async def process_visual_style(callback: CallbackQuery, state: FSMContext):
-    visual = callback.data.split(":")[1]
-    data = await state.get_data()
-    lang = data.get("lang", "uk")
-
-    await state.update_data(visual_style=visual, selected=[])
-    await state.set_state(BaseSurveyStates.characters_like)
-
-    await callback.message.edit_text(
-        f"{get_text('base_q9_characters_like', lang)}\n\n{get_text('select_multiple', lang)}",
-        reply_markup=get_multi_select_keyboard(CHARACTER_OPTIONS, set(), lang, "base_char_like")
-    )
-    await callback.answer()
-
-
-# Step 9: Characters Like
+# Step 7: Characters Like
 @router.callback_query(BaseSurveyStates.characters_like, F.data.startswith("base_char_like:"))
 async def process_characters_like(callback: CallbackQuery, state: FSMContext):
     action = callback.data.split(":")[1]
@@ -331,11 +297,11 @@ async def process_characters_like(callback: CallbackQuery, state: FSMContext):
             return
 
         await state.update_data(characters_like=list(selected), selected=[])
-        await state.set_state(BaseSurveyStates.characters_dislike)
+        await state.set_state(BaseSurveyStates.taboo)
 
         await callback.message.edit_text(
-            f"{get_text('base_q10_characters_dislike', lang)}\n\n{get_text('select_multiple', lang)}",
-            reply_markup=get_multi_select_keyboard(CHARACTER_OPTIONS, set(), lang, "base_char_dislike")
+            get_text("base_q11_taboo", lang),
+            reply_markup=get_skip_keyboard(lang, "base_taboo")
         )
     else:
         if action in selected:
@@ -351,41 +317,29 @@ async def process_characters_like(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
-# Step 10: Characters Dislike
-@router.callback_query(BaseSurveyStates.characters_dislike, F.data.startswith("base_char_dislike:"))
-async def process_characters_dislike(callback: CallbackQuery, state: FSMContext):
-    action = callback.data.split(":")[1]
+# Step 9: Taboo (text input or skip)
+@router.callback_query(BaseSurveyStates.taboo, F.data == "base_taboo:skip")
+async def skip_taboo(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     lang = data.get("lang", "uk")
-    selected = set(data.get("selected", []))
 
-    if action == "done":
-        await state.update_data(characters_dislike=list(selected))
-        await state.set_state(BaseSurveyStates.taboo)
+    await state.update_data(taboo="", selected=[])
+    await state.set_state(BaseSurveyStates.afterfeel)
 
-        await callback.message.edit_text(get_text("base_q11_taboo", lang))
-    else:
-        if action in selected:
-            selected.remove(action)
-        else:
-            selected.add(action)
-
-        await state.update_data(selected=list(selected))
-        await callback.message.edit_reply_markup(
-            reply_markup=get_multi_select_keyboard(CHARACTER_OPTIONS, selected, lang, "base_char_dislike")
-        )
-
+    await callback.message.edit_text(
+        f"{get_text('base_q12_afterfeel', lang)}\n\n{get_text('select_multiple', lang)}",
+        reply_markup=get_multi_select_keyboard(AFTERFEEL_OPTIONS, set(), lang, "base_afterfeel")
+    )
     await callback.answer()
 
 
-# Step 11: Taboo (text input)
 @router.message(BaseSurveyStates.taboo)
 async def process_taboo(message: Message, state: FSMContext):
     data = await state.get_data()
     lang = data.get("lang", "uk")
 
     text = message.text.lower()
-    if text in ["нічого", "nothing", "ні", "no"]:
+    if text in ["нічого", "nothing", "ні", "no", "пропустити", "skip"]:
         await state.update_data(taboo="")
     else:
         await state.update_data(taboo=message.text)
@@ -399,7 +353,7 @@ async def process_taboo(message: Message, state: FSMContext):
     )
 
 
-# Step 12: Afterfeel (final step)
+# Step 10: Afterfeel (final step)
 @router.callback_query(BaseSurveyStates.afterfeel, F.data.startswith("base_afterfeel:"))
 async def process_afterfeel(callback: CallbackQuery, state: FSMContext, db: Database):
     action = callback.data.split(":")[1]
@@ -418,12 +372,12 @@ async def process_afterfeel(callback: CallbackQuery, state: FSMContext, db: Data
             "emotions_dislike": data.get("emotions_dislike", []),
             "complexity": data.get("complexity", "any"),
             "favorite_movies": data.get("favorite_movies", ""),
-            "disliked_movies": data.get("disliked_movies", ""),
+            "disliked_movies": "",
             "genres_like": data.get("genres_like", []),
-            "genres_dislike": data.get("genres_dislike", []),
-            "visual_style": data.get("visual_style", "any"),
+            "genres_dislike": [],
+            "visual_style": data.get("visual_style", []),
             "characters_like": data.get("characters_like", []),
-            "characters_dislike": data.get("characters_dislike", []),
+            "characters_dislike": [],
             "taboo": data.get("taboo", ""),
             "afterfeel": list(selected),
         }
@@ -433,7 +387,9 @@ async def process_afterfeel(callback: CallbackQuery, state: FSMContext, db: Data
 
         await state.clear()
 
-        await callback.message.edit_text(get_text("base_survey_complete", lang))
+        await callback.message.edit_text(
+            f"{get_text('base_survey_complete', lang)}\n\n{get_text('try_find_movie', lang)}"
+        )
         await callback.message.answer(
             get_text("main_menu", lang),
             reply_markup=get_main_menu_keyboard(lang)

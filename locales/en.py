@@ -15,7 +15,8 @@ TEXTS = {
 
     # Base survey intro
     "base_survey_intro": "Let's create your movie profile first. This will help me understand your tastes better. Be honest!",
-    "base_survey_complete": "Great! Your profile is created. Now I'm ready to find movies specially for you!",
+    "base_survey_complete": "Great! Your profile is created.",
+    "try_find_movie": "Now try clicking «Find a movie» - I'll pick something special for you!",
 
     # Base survey questions (8 steps)
     "base_q1_emotions_like": "What emotions do you enjoy feeling most while watching a movie?",
